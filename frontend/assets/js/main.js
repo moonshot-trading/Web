@@ -1,4 +1,6 @@
 var Username;
+var lastBuy;
+var lastSell;
 
 $("#set-user").on("submit", function(e) {
 	e.preventDefault();
@@ -27,12 +29,38 @@ $("#set-user").on("submit", function(e) {
 });
 
 
+$("#add-funds").on("submit", function(e) {
+	e.preventDefault();
+
+	var formData = {
+		'UserId'		     : Username,
+		'Amount'			 : $('input[name="AmountFunds"').val()
+	};
+
+	$.ajax({
+		url:'/AddFunds',
+		type:'post',
+		dataType: "json",
+		contentType: 'application/json; charset=utf-8',
+		data: JSON.stringify(formData),
+		success:function(data){
+			console.log(data);
+			$('#funds-added').replaceWith(document.createTextNode( "Added funds : " + data.Amount ) );
+		},
+		error: function (xhr, status) {
+			alert("Sorry, there was a problem!");
+		},
+	});
+	return false;
+});
+
+
 $("#get-quote").on("submit", function(e) {
 	e.preventDefault();
 
 	var formData = {
-		'Stock'              : $('input[name="Stock"').val(),
-		'User'				 : Username
+		'StockSymbol'            : $('input[name="Stock"').val(),
+		'UserId'				 : Username
 	};
 
 	$.ajax({
@@ -57,8 +85,8 @@ $("#buy-stock").on("submit", function(e) {
 	e.preventDefault();
 
 	var formData = {
-		'User'				 : Username,
-		'Stock'				 : $('input[name="StockBuy"').val(),
+		'UserId'				 : Username,
+		'StockSymbol'				 : $('input[name="StockBuy"').val(),
 		'Amount'			 : Number($('input[name="AmountBuy"').val()),
 	};
 
@@ -69,13 +97,18 @@ $("#buy-stock").on("submit", function(e) {
 		contentType: 'application/json; charset=utf-8',
 		data: JSON.stringify(formData),
 		success:function(data){
+			lastBuy = getTime();
 			console.log(data);
 			$('#confirm-buy').html( "Buy : " + data.Amount + "  Of : " + data.Stock );
 			var r = confirm("Buy stock?");
 				if (r == true) {
-					cancelorConfirm(data, '/CommitBuy', 'Commited');
+					if(!(getTime()>lastBuy+6000)){
+						cancelorConfirm(data, '/CommitBuy', 'Commited');
+					}
 				} else {
-					cancelorConfirm(data, '/CancelBuy', 'Cancelled');
+					if(!(getTime()>lastBuy+6000)){
+						cancelorConfirm(data, '/CancelBuy', 'Cancelled');
+					}
 				}
 		},
 		error: function (xhr, status) {
@@ -87,7 +120,7 @@ $("#buy-stock").on("submit", function(e) {
 
 function cancelorConfirm(d, url, msg){
 	var formData = {
-		'User'				 : d.User
+		'UserId'				 : d.User
 	};
 	$.ajax({
 		url: url,
@@ -110,8 +143,8 @@ $("#sell-stock").on("submit", function(e) {
 	e.preventDefault();
 
 	var formData = {
-		'User'				 : Username,
-		'Stock'				 : $('input[name="StockSell"').val(),
+		'UserId'				 : Username,
+		'StockSymbol'				 : $('input[name="StockSell"').val(),
 		'Amount'			 : Number($('input[name="AmountSell"').val()),
 	};
 
@@ -123,12 +156,17 @@ $("#sell-stock").on("submit", function(e) {
 		data: JSON.stringify(formData),
 		success:function(data){
 			console.log(data);
+			lastSell = getTime();
 			$('#confirm-sell').html( "Sell : " + data.Amount + "  Of : " + data.Stock );
 			var r = confirm("Sell stock?");
 				if (r == true) {
-					cancelorConfirm(data, '/CommitSell', 'Commited');
+					if(!(getTime()>lastSell+6000)){
+						cancelorConfirm(data, '/CommitSell', 'Commited');
+					}
 				} else {
-					cancelorConfirm(data, '/CancelSell', 'Cancelled');
+					if(!(getTime()>lastSell+6000)){
+						cancelorConfirm(data, '/CancelSell', 'Cancelled');
+					}
 				}
 		},
 		error: function (xhr, status) {

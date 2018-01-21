@@ -8,17 +8,22 @@ import (
 )
 
 type GetQuote struct {
-	Stock string
-	User  string
+	StockSymbol string
+	UserId      string
 }
 
 type GetUser struct {
-	User string
+	UserId string
 }
 
 type StockValue struct {
-	User   string
-	Stock  string
+	UserId      string
+	StockSymbol string
+	Amount      int
+}
+
+type AddFunds struct {
+	UserId string
 	Amount int
 }
 
@@ -27,7 +32,7 @@ type ReturnQuote struct {
 	Price int
 }
 
-var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])")
+var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
 
 func checkValidStockName(s string) bool {
 	m := stockName.FindStringSubmatch(s)
@@ -46,12 +51,14 @@ func verifyGetUser(w http.ResponseWriter, r *http.Request, d *GetUser) bool {
 	}
 
 	if r.Method == "POST" {
-		if d.User == "" {
+		if d.UserId == "" {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return false
 		}
+		return true
+	} else {
+		return false
 	}
-	return true
 }
 
 func verifyStockValueRequests(w http.ResponseWriter, r *http.Request, d *StockValue) bool {
@@ -64,7 +71,7 @@ func verifyStockValueRequests(w http.ResponseWriter, r *http.Request, d *StockVa
 
 	if r.Method == "POST" {
 
-		pass := checkValidStockName(d.Stock)
+		pass := checkValidStockName(d.StockSymbol)
 		if pass == false {
 			http.Error(w, "Wrong stock symbol", http.StatusInternalServerError)
 			return false
@@ -74,21 +81,65 @@ func verifyStockValueRequests(w http.ResponseWriter, r *http.Request, d *StockVa
 			http.Error(w, "No money", http.StatusInternalServerError)
 			return false
 		}
-		if d.User == "" {
+		if d.UserId == "" {
 			http.Error(w, "No User", http.StatusInternalServerError)
 			return false
 		}
+		return true
+	} else {
+		return false
 	}
-	return true
+}
+
+func verifyQuoteRequests(w http.ResponseWriter, r *http.Request, d *GetQuote) bool {
+	err := json.NewDecoder(r.Body).Decode(&d)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return false
+	}
+
+	if r.Method == "POST" {
+
+		pass := checkValidStockName(d.StockSymbol)
+		if pass == false {
+			http.Error(w, "Wrong stock symbol", http.StatusInternalServerError)
+			return false
+		}
+
+		if d.UserId == "" {
+			http.Error(w, "Empty User", http.StatusInternalServerError)
+			return false
+		}
+
+		return true
+	} else {
+		return false
+		//not post
+	}
 }
 
 //add some error passing from TS
 func respondStockValueRequests(w http.ResponseWriter, d StockValue) {
 
 	response := StockValue{}
-	response.Stock = d.Stock
+	response.StockSymbol = d.StockSymbol
 	response.Amount = 123 //this amount will be rounded and returned in TS
-	response.User = d.User
+	response.UserId = d.UserId
+
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJson)
+}
+
+func respondQuoteRequests(w http.ResponseWriter, d GetQuote) {
+
+	response := ReturnQuote{}
+	response.Stock = d.StockSymbol
+	response.Price = 123
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -102,36 +153,13 @@ func respondStockValueRequests(w http.ResponseWriter, d StockValue) {
 func quoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d GetQuote
-	err := json.NewDecoder(r.Body).Decode(&d)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+
+	if !verifyQuoteRequests(w, r, &d) {
+		return
 	}
+	fmt.Println("Quote", d)
 
-	if r.Method == "POST" {
-
-		pass := checkValidStockName(d.Stock)
-		if pass == false {
-			http.Error(w, "Wrong stock symbol", http.StatusInternalServerError)
-			return
-		}
-
-		if d.User == "" {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		response := ReturnQuote{}
-		response.Stock = d.Stock
-		response.Price = 123
-
-		responseJson, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Write(responseJson)
-	}
+	respondQuoteRequests(w, d)
 }
 
 func addUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -145,8 +173,44 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 	//maybe send back if they are new or existing
 
 	response := GetUser{}
-	response.User = d.User
+	response.UserId = d.UserId
 
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJson)
+}
+
+func addFundsHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d AddFunds
+	err := json.NewDecoder(r.Body).Decode(&d)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Add funds", d)
+	if r.Method == "POST" {
+		if d.UserId == "" {
+			http.Error(w, "No User", http.StatusInternalServerError)
+			return
+		}
+		if d.Amount < 1 {
+			http.Error(w, "Negative funds cannot be added", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	//hit TS to check that user exists
+	//maybe send back if they are new or existing
+
+	response := AddFunds{}
+	response.UserId = d.UserId
+	response.Amount = d.Amount
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -162,6 +226,7 @@ func buyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
+	fmt.Println("Buy", d)
 	//check user account
 
 	respondStockValueRequests(w, d)
@@ -173,13 +238,13 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyGetUser(w, r, &d) {
 		return
 	}
-
+	fmt.Println("commit buy", d)
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
 
 	response := GetUser{}
-	response.User = d.User
+	response.UserId = d.UserId
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -197,12 +262,13 @@ func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("cancel buy", d)
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
 
 	response := GetUser{}
-	response.User = d.User
+	response.UserId = d.UserId
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -217,9 +283,11 @@ func sellHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d StockValue
 	if !verifyStockValueRequests(w, r, &d) {
+		fmt.Println("sell error", d)
 		return
 	}
 
+	fmt.Println("sell ", d)
 	//check user account
 
 	respondStockValueRequests(w, d)
@@ -232,12 +300,14 @@ func commitSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("commit sell", d)
+
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
 
 	response := GetUser{}
-	response.User = d.User
+	response.UserId = d.UserId
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -255,12 +325,13 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("cancel sell", d)
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
 
 	response := GetUser{}
-	response.User = d.User
+	response.UserId = d.UserId
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -271,30 +342,115 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseJson)
 }
 
+func setBuyHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d StockValue
+	if !verifyStockValueRequests(w, r, &d) {
+		return
+	}
+	fmt.Println("Set Buy", d)
+	//check user account
+
+	respondStockValueRequests(w, d)
+}
+
+func cancelSetBuyHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d GetQuote
+
+	if !verifyQuoteRequests(w, r, &d) {
+		return
+	}
+	fmt.Println("Cancel Set Buy", d)
+	respondQuoteRequests(w, d)
+}
+
 func buyTriggerHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d StockValue
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
+	fmt.Println("buy trigger", d)
 
+	//check user account
+	respondStockValueRequests(w, d)
+}
+
+func setSellHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d StockValue
+	if !verifyStockValueRequests(w, r, &d) {
+		return
+	}
+	fmt.Println("Set Sell", d)
 	//check user account
 
 	respondStockValueRequests(w, d)
+}
 
+func cancelSetSellHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d GetQuote
+
+	if !verifyQuoteRequests(w, r, &d) {
+		return
+	}
+	fmt.Println("Cancel Set Sell", d)
+	respondQuoteRequests(w, d)
+}
+
+func sellTriggerHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d StockValue
+	if !verifyStockValueRequests(w, r, &d) {
+		return
+	}
+	fmt.Println("sell trigger", d)
+
+	//check user account
+	respondStockValueRequests(w, d)
+}
+
+func displaySummaryHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d GetUser
+	if !verifyGetUser(w, r, &d) {
+		return
+	}
+
+	fmt.Println("diaply summary", d)
+	//the response type will be different later it will be a bunch of data
+	response := GetUser{}
+	response.UserId = d.UserId
+
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJson)
 }
 
 func main() {
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
 	http.HandleFunc("/GetQuote", quoteHandler)
 	http.HandleFunc("/AddUser", addUserHandler)
+	http.HandleFunc("/AddFunds", addFundsHandler)
 	http.HandleFunc("/BuyStock", buyHandler)
 	http.HandleFunc("/CommitBuy", commitBuyHandler)
 	http.HandleFunc("/CancelBuy", cancelBuyHandler)
+	http.HandleFunc("/SellStock", sellHandler)
 	http.HandleFunc("/CancelSell", cancelSellHandler)
 	http.HandleFunc("/CommitSell", commitSellHandler)
-	http.HandleFunc("/SellStock", buyHandler)
-	http.HandleFunc("/BuyStockTrigger", buyTriggerHandler)
+	http.HandleFunc("/SetBuyAmount", setBuyHandler)
+	http.HandleFunc("/SetBuyTrigger", buyTriggerHandler)
+	http.HandleFunc("/CancelSetBuy", cancelSetBuyHandler)
+	http.HandleFunc("/SetSellAmount", setSellHandler)
+	http.HandleFunc("/SetSellTrigger", sellTriggerHandler)
+	http.HandleFunc("/CancelSetSell", cancelSetSellHandler)
+	http.HandleFunc("/DisplaySummary", displaySummaryHandler)
 
 	http.ListenAndServe(":8080", nil)
 }
