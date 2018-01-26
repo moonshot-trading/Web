@@ -9,28 +9,38 @@ import (
 )
 
 type GetQuote struct {
-	StockSymbol string
-	UserId      string
+	StockSymbol    string
+	UserId         string
+	TransactionNum int
 }
 
 type GetUser struct {
-	UserId string
+	UserId         string
+	TransactionNum int
+}
+
+type Dumplog struct {
+	Filename       string
+	TransactionNum int
 }
 
 type StockValue struct {
-	UserId      string
-	StockSymbol string
-	Amount      int
+	UserId         string
+	StockSymbol    string
+	Amount         int
+	TransactionNum int
 }
 
 type AddFunds struct {
-	UserId string
-	Amount int
+	UserId         string
+	Amount         int
+	TransactionNum int
 }
 
 type ReturnQuote struct {
-	Stock string
-	Price int
+	Stock          string
+	Price          int
+	TransactionNum int
 }
 
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
@@ -127,7 +137,7 @@ func respondStockValueRequests(w http.ResponseWriter, d StockValue) {
 	response.StockSymbol = d.StockSymbol
 	response.Amount = 123 //this amount will be rounded and returned in TS
 	response.UserId = d.UserId
-
+	response.TransactionNum = d.TransactionNum
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -142,6 +152,7 @@ func respondQuoteRequests(w http.ResponseWriter, d GetQuote) {
 	response := ReturnQuote{}
 	response.Stock = d.StockSymbol
 	response.Price = 123
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -170,6 +181,7 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d GetUser
 	if !verifyGetUser(w, r, &d) {
+		fmt.Println("no yeet")
 		return
 	}
 
@@ -178,6 +190,7 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := GetUser{}
 	response.UserId = d.UserId
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -217,6 +230,8 @@ func addFundsHandler(w http.ResponseWriter, r *http.Request) {
 	response := AddFunds{}
 	response.UserId = d.UserId
 	response.Amount = d.Amount
+	response.TransactionNum = d.TransactionNum
+
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -253,7 +268,7 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := GetUser{}
 	response.UserId = d.UserId
-
+	response.TransactionNum = d.TransactionNum
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -279,6 +294,7 @@ func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := GetUser{}
 	response.UserId = d.UserId
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -321,6 +337,7 @@ func commitSellHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := GetUser{}
 	response.UserId = d.UserId
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -347,6 +364,7 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := GetUser{}
 	response.UserId = d.UserId
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -445,9 +463,32 @@ func displaySummaryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("diaply summary", d)
+	sendToTServer(d, "displaySummary")
 	//the response type will be different later it will be a bunch of data
 	response := GetUser{}
 	response.UserId = d.UserId
+	response.TransactionNum = d.TransactionNum
+
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(responseJson)
+}
+
+func dumplogHandler(w http.ResponseWriter, r *http.Request) {
+
+	var d Dumplog
+
+	fmt.Println("dump", d)
+	sendToTServer(d, "dumpLog")
+
+	//the response type will be different later it will be a bunch of data
+	response := Dumplog{}
+	response.Filename = d.Filename
+	response.TransactionNum = d.TransactionNum
 
 	responseJson, err := json.Marshal(response)
 	if err != nil {
@@ -489,6 +530,7 @@ func main() {
 	http.HandleFunc("/SetSellAmount", setSellHandler)
 	http.HandleFunc("/SetSellTrigger", sellTriggerHandler)
 	http.HandleFunc("/CancelSetSell", cancelSetSellHandler)
+	http.HandleFunc("/Dumplog", displaySummaryHandler)
 	http.HandleFunc("/DisplaySummary", displaySummaryHandler)
 
 	http.ListenAndServe(":8080", nil)
