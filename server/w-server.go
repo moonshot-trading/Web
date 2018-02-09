@@ -508,8 +508,8 @@ func failOnError(err error, msg string) {
 
 func sendToTServer(r interface{}, s string) *http.Response {
 	jsonValue, _ := json.Marshal(r)
-	resp, err := http.Post("http://localhost:44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
-	failOnError(err, "Error sending request tp TS")
+	resp, err := http.Post("http://transaction-server:44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+	failOnError(err, "Error sending request to TS")
 	return resp
 }
 
@@ -530,10 +530,8 @@ func main() {
 	http.HandleFunc("/SetSellAmount", setSellHandler)
 	http.HandleFunc("/SetSellTrigger", sellTriggerHandler)
 	http.HandleFunc("/CancelSetSell", cancelSetSellHandler)
-	http.HandleFunc("/Dumplog", displaySummaryHandler)
+	http.HandleFunc("/Dumplog", dumplogHandler)
 	http.HandleFunc("/DisplaySummary", displaySummaryHandler)
 
 	http.ListenAndServe(":8080", nil)
-
-	fmt.Println("WebServer running 8080")
 }
