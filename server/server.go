@@ -3,7 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 )
@@ -45,10 +46,14 @@ type ReturnQuote struct {
 
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
 
+//ioutil.Discard
+//os.Stdout
+var Log = log.New(ioutil.Discard, "LOG: ", log.Ldate|log.Ltime|log.Lshortfile)
+
 func checkValidStockName(s string) bool {
 	m := stockName.FindStringSubmatch(s)
 	if m == nil {
-		fmt.Println("bad stock name")
+		Log.Println("bad stock name")
 		return false
 	}
 	return true
@@ -76,7 +81,6 @@ func verifyGetUser(w http.ResponseWriter, r *http.Request, d *GetUser) bool {
 func verifyStockValueRequests(w http.ResponseWriter, r *http.Request, d *StockValue) bool {
 	err := json.NewDecoder(r.Body).Decode(&d)
 	if err != nil {
-		fmt.Println("yeet")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return false
 	}
@@ -170,7 +174,7 @@ func quoteHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyQuoteRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Quote", d)
+	Log.Println("Quote", d)
 
 	sendToTServer(d, "quote")
 
@@ -181,7 +185,6 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d GetUser
 	if !verifyGetUser(w, r, &d) {
-		fmt.Println("no yeet")
 		return
 	}
 
@@ -210,7 +213,7 @@ func addFundsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Add funds", d)
+	Log.Println("Add funds", d)
 	if r.Method == "POST" {
 		if d.UserId == "" {
 			http.Error(w, "No User", http.StatusInternalServerError)
@@ -247,7 +250,7 @@ func buyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Buy", d)
+	Log.Println("Buy", d)
 	//check user account
 	sendToTServer(d, "buy")
 
@@ -260,7 +263,7 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyGetUser(w, r, &d) {
 		return
 	}
-	fmt.Println("commit buy", d)
+	Log.Println("commit buy", d)
 	sendToTServer(d, "confirmBuy")
 	//hit TS to check that user exists
 	//confirm buy etc
@@ -285,7 +288,7 @@ func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("cancel buy", d)
+	Log.Println("cancel buy", d)
 
 	sendToTServer(d, "cancelBuy")
 	//hit TS to check that user exists
@@ -309,11 +312,11 @@ func sellHandler(w http.ResponseWriter, r *http.Request) {
 
 	var d StockValue
 	if !verifyStockValueRequests(w, r, &d) {
-		fmt.Println("sell error", d)
+		Log.Println("sell error", d)
 		return
 	}
 
-	fmt.Println("sell ", d)
+	Log.Println("sell ", d)
 	sendToTServer(d, "sell")
 
 	//check user account
@@ -328,7 +331,7 @@ func commitSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("commit sell", d)
+	Log.Println("commit sell", d)
 	sendToTServer(d, "confirmSell")
 
 	//hit TS to check that user exists
@@ -355,7 +358,7 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("cancel sell", d)
+	Log.Println("cancel sell", d)
 	sendToTServer(d, "cancelSell")
 
 	//hit TS to check that user exists
@@ -381,7 +384,7 @@ func setBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Set Buy", d)
+	Log.Println("Set Buy", d)
 	sendToTServer(d, "setBuy")
 
 	//check user account
@@ -396,7 +399,7 @@ func cancelSetBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyQuoteRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Cancel Set Buy", d)
+	Log.Println("Cancel Set Buy", d)
 	sendToTServer(d, "cancelSetBuy")
 
 	respondQuoteRequests(w, d)
@@ -408,7 +411,7 @@ func buyTriggerHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("buy trigger", d)
+	Log.Println("buy trigger", d)
 	sendToTServer(d, "setBuyTrigger")
 
 	//check user account
@@ -421,7 +424,7 @@ func setSellHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Set Sell", d)
+	Log.Println("Set Sell", d)
 	sendToTServer(d, "setSell")
 
 	//check user account
@@ -436,7 +439,7 @@ func cancelSetSellHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyQuoteRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("Cancel Set Sell", d)
+	Log.Println("Cancel Set Sell", d)
 	sendToTServer(d, "cancelSetSell")
 
 	respondQuoteRequests(w, d)
@@ -448,7 +451,7 @@ func sellTriggerHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyStockValueRequests(w, r, &d) {
 		return
 	}
-	fmt.Println("sell trigger", d)
+	Log.Println("sell trigger", d)
 	sendToTServer(d, "setSellTrigger")
 
 	//check user account
@@ -462,7 +465,7 @@ func displaySummaryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("diaply summary", d)
+	Log.Println("diaply summary", d)
 	sendToTServer(d, "displaySummary")
 	//the response type will be different later it will be a bunch of data
 	response := GetUser{}
@@ -488,7 +491,7 @@ func dumplogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("dump", d)
+	Log.Println("dump", d)
 	sendToTServer(d, "dumpLog")
 
 	//the response type will be different later it will be a bunch of data
@@ -507,7 +510,7 @@ func dumplogHandler(w http.ResponseWriter, r *http.Request) {
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		fmt.Printf("%s: %s", msg, err)
+		Log.Printf("%s: %s", msg, err)
 		panic(err)
 	}
 }
