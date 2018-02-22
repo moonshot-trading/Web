@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"os"
 )
 
 type GetQuote struct {
@@ -44,7 +45,12 @@ type ReturnQuote struct {
 	TransactionNum int
 }
 
+type webConfig struct {
+	ts string
+}
+
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
+var config = webConfig{func() string { if runningInDocker() {return "transaction-server"} else {return "localhost"}}()}
 
 //ioutil.Discard
 //os.Stdout
@@ -512,10 +518,19 @@ func failOnError(err error, msg string) {
 
 func sendToTServer(r interface{}, s string) *http.Response {
 	jsonValue, _ := json.Marshal(r)
-	resp, err := http.Post("http://transaction-server:44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+	resp, err := http.Post("http://"+config.ts+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
 	failOnError(err, "Error sending request tp TS")
 	return resp
 }
+
+func runningInDocker() bool {
+	_, err := os.Stat("/.dockerenv")
+	if err == nil {
+		return true
+	}
+	return false
+}
+
 
 func main() {
 	//http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
