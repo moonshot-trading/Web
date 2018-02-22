@@ -142,13 +142,13 @@ func respondStockValueRequests(w http.ResponseWriter, d StockValue) {
 	response.Amount = 123 //this amount will be rounded and returned in TS
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func respondQuoteRequests(w http.ResponseWriter, d GetQuote) {
@@ -158,13 +158,13 @@ func respondQuoteRequests(w http.ResponseWriter, d GetQuote) {
 	response.Price = 123
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func quoteHandler(w http.ResponseWriter, r *http.Request) {
@@ -195,13 +195,13 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func addFundsHandler(w http.ResponseWriter, r *http.Request) {
@@ -219,10 +219,6 @@ func addFundsHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "No User", http.StatusInternalServerError)
 			return
 		}
-		if d.Amount < 1 {
-			http.Error(w, "Negative funds cannot be added", http.StatusInternalServerError)
-			return
-		}
 	}
 
 	//hit TS to check that user exists
@@ -235,13 +231,13 @@ func addFundsHandler(w http.ResponseWriter, r *http.Request) {
 	response.Amount = d.Amount
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err = json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func buyHandler(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +259,6 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyGetUser(w, r, &d) {
 		return
 	}
-	Log.Println("commit buy", d)
 	sendToTServer(d, "confirmBuy")
 	//hit TS to check that user exists
 	//confirm buy etc
@@ -272,13 +267,13 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 	response := GetUser{}
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
@@ -299,13 +294,13 @@ func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func sellHandler(w http.ResponseWriter, r *http.Request) {
@@ -342,13 +337,13 @@ func commitSellHandler(w http.ResponseWriter, r *http.Request) {
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
@@ -369,13 +364,13 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func setBuyHandler(w http.ResponseWriter, r *http.Request) {
@@ -472,13 +467,13 @@ func displaySummaryHandler(w http.ResponseWriter, r *http.Request) {
 	response.UserId = d.UserId
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func dumplogHandler(w http.ResponseWriter, r *http.Request) {
@@ -499,13 +494,13 @@ func dumplogHandler(w http.ResponseWriter, r *http.Request) {
 	response.Filename = d.Filename
 	response.TransactionNum = d.TransactionNum
 
-	responseJson, err := json.Marshal(response)
+	_, err = json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(responseJson)
+	w.WriteHeader(200)
 }
 
 func failOnError(err error, msg string) {
@@ -523,7 +518,7 @@ func sendToTServer(r interface{}, s string) *http.Response {
 }
 
 func main() {
-	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
+	//http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
 	http.HandleFunc("/GetQuote", quoteHandler)
 	http.HandleFunc("/AddUser", addUserHandler)
 	http.HandleFunc("/AddFunds", addFundsHandler)

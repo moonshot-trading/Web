@@ -1,4 +1,4 @@
-FROM golang:1.9-alpine3.6
+FROM golang:1.9-alpine3.7
 
 RUN mkdir -p /go/src/github.com/moonshot-trading/Web/
 
