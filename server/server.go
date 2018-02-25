@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"regexp"
 	"os"
+	"regexp"
 )
 
 type GetQuote struct {
@@ -50,7 +51,13 @@ type webConfig struct {
 }
 
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
-var config = webConfig{func() string { if runningInDocker() {return "transaction-server"} else {return "localhost"}}()}
+var config = webConfig{func() string {
+	if runningInDocker() {
+		return "transaction-server"
+	} else {
+		return "localhost"
+	}
+}()}
 
 //ioutil.Discard
 //os.Stdout
@@ -516,11 +523,12 @@ func failOnError(err error, msg string) {
 	}
 }
 
-func sendToTServer(r interface{}, s string) *http.Response {
+func sendToTServer(r interface{}, s string) {
 	jsonValue, _ := json.Marshal(r)
 	resp, err := http.Post("http://"+config.ts+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
 	failOnError(err, "Error sending request tp TS")
-	return resp
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 }
 
 func runningInDocker() bool {
@@ -530,7 +538,6 @@ func runningInDocker() bool {
 	}
 	return false
 }
-
 
 func main() {
 	//http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
