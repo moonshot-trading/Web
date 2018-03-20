@@ -53,7 +53,7 @@ type webConfig struct {
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
 var config = webConfig{func() string {
 	if runningInDocker() {
-		return "transaction-server"
+		return os.Getenv("TX_SERVER_HOST")
 	} else {
 		return "localhost"
 	}
