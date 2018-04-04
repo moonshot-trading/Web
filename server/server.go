@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -50,10 +51,61 @@ type webConfig struct {
 	ts string
 }
 
+type webConfig2 struct {
+	ts2 string
+}
+
+type webConfig3 struct {
+	ts3 string
+}
+
+type webConfig4 struct {
+	ts4 string
+}
+
+type webConfig5 struct {
+	ts5 string
+}
+
 var stockName = regexp.MustCompile("([a-zA-Z][a-zA-Z][a-zA-Z])|([a-zA-Z])")
+
+var semaphoreChan = make(chan struct{}, 80)
+
 var config = webConfig{func() string {
 	if runningInDocker() {
 		return os.Getenv("TX_SERVER_HOST")
+	} else {
+		return "localhost"
+	}
+}()}
+
+var config2 = webConfig2{func() string {
+	if runningInDocker() {
+		return os.Getenv("TX_SERVER_HOST_2")
+	} else {
+		return "localhost"
+	}
+}()}
+
+var config3 = webConfig3{func() string {
+	if runningInDocker() {
+		return os.Getenv("TX_SERVER_HOST_3")
+	} else {
+		return "localhost"
+	}
+}()}
+
+var config4 = webConfig4{func() string {
+	if runningInDocker() {
+		return os.Getenv("TX_SERVER_HOST_4")
+	} else {
+		return "localhost"
+	}
+}()}
+
+var config5 = webConfig5{func() string {
+	if runningInDocker() {
+		return os.Getenv("TX_SERVER_HOST_5")
 	} else {
 		return "localhost"
 	}
@@ -106,10 +158,6 @@ func verifyStockValueRequests(w http.ResponseWriter, r *http.Request, d *StockVa
 			return false
 		}
 
-		if d.Amount == 0 {
-			http.Error(w, "No money", http.StatusInternalServerError)
-			return false
-		}
 		if d.UserId == "" {
 			http.Error(w, "No User", http.StatusInternalServerError)
 			return false
@@ -189,7 +237,7 @@ func quoteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Println("Quote", d)
 
-	sendToTServer(d, "quote")
+	sendToTServer(d, d.UserId, "quote")
 
 	respondQuoteRequests(w, d)
 }
@@ -237,7 +285,7 @@ func addFundsHandler(w http.ResponseWriter, r *http.Request) {
 	//hit TS to check that user exists
 	//maybe send back if they are new or existing
 
-	sendToTServer(d, "add")
+	sendToTServer(d, d.UserId, "add")
 
 	response := AddFunds{}
 	response.UserId = d.UserId
@@ -261,7 +309,7 @@ func buyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Println("Buy", d)
 	//check user account
-	sendToTServer(d, "buy")
+	sendToTServer(d, d.UserId, "buy")
 
 	respondStockValueRequests(w, d)
 }
@@ -272,7 +320,7 @@ func commitBuyHandler(w http.ResponseWriter, r *http.Request) {
 	if !verifyGetUser(w, r, &d) {
 		return
 	}
-	sendToTServer(d, "confirmBuy")
+	sendToTServer(d, d.UserId, "confirmBuy")
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
@@ -298,7 +346,7 @@ func cancelBuyHandler(w http.ResponseWriter, r *http.Request) {
 
 	Log.Println("cancel buy", d)
 
-	sendToTServer(d, "cancelBuy")
+	sendToTServer(d, d.UserId, "cancelBuy")
 	//hit TS to check that user exists
 	//confirm buy etc
 	//not sure what sending back w yet
@@ -325,7 +373,7 @@ func sellHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Log.Println("sell ", d)
-	sendToTServer(d, "sell")
+	sendToTServer(d, d.UserId, "sell")
 
 	//check user account
 
@@ -340,7 +388,7 @@ func commitSellHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Log.Println("commit sell", d)
-	sendToTServer(d, "confirmSell")
+	sendToTServer(d, d.UserId, "confirmSell")
 
 	//hit TS to check that user exists
 	//confirm buy etc
@@ -367,7 +415,7 @@ func cancelSellHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Log.Println("cancel sell", d)
-	sendToTServer(d, "cancelSell")
+	sendToTServer(d, d.UserId, "cancelSell")
 
 	//hit TS to check that user exists
 	//confirm buy etc
@@ -393,7 +441,7 @@ func setBuyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("Set Buy", d)
-	sendToTServer(d, "setBuy")
+	sendToTServer(d, d.UserId, "setBuy")
 
 	//check user account
 
@@ -408,7 +456,7 @@ func cancelSetBuyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("Cancel Set Buy", d)
-	sendToTServer(d, "cancelSetBuy")
+	sendToTServer(d, d.UserId, "cancelSetBuy")
 
 	respondQuoteRequests(w, d)
 }
@@ -420,7 +468,7 @@ func buyTriggerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("buy trigger", d)
-	sendToTServer(d, "setBuyTrigger")
+	sendToTServer(d, d.UserId, "setBuyTrigger")
 
 	//check user account
 	respondStockValueRequests(w, d)
@@ -433,7 +481,7 @@ func setSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("Set Sell", d)
-	sendToTServer(d, "setSell")
+	sendToTServer(d, d.UserId, "setSell")
 
 	//check user account
 
@@ -448,7 +496,7 @@ func cancelSetSellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("Cancel Set Sell", d)
-	sendToTServer(d, "cancelSetSell")
+	sendToTServer(d, d.UserId, "cancelSetSell")
 
 	respondQuoteRequests(w, d)
 }
@@ -460,7 +508,7 @@ func sellTriggerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Println("sell trigger", d)
-	sendToTServer(d, "setSellTrigger")
+	sendToTServer(d, d.UserId, "setSellTrigger")
 
 	//check user account
 	respondStockValueRequests(w, d)
@@ -474,7 +522,7 @@ func displaySummaryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Log.Println("diaply summary", d)
-	sendToTServer(d, "displaySummary")
+	sendToTServer(d, d.UserId, "displaySummary")
 	//the response type will be different later it will be a bunch of data
 	response := GetUser{}
 	response.UserId = d.UserId
@@ -500,7 +548,7 @@ func dumplogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Log.Println("dump", d)
-	sendToTServer(d, "dumpLog")
+	sendToTServer(d, "", "dumpLog")
 
 	//the response type will be different later it will be a bunch of data
 	response := Dumplog{}
@@ -518,17 +566,66 @@ func dumplogHandler(w http.ResponseWriter, r *http.Request) {
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		Log.Printf("%s: %s", msg, err)
+		fmt.Printf("%s: %s\n", msg, err)
 		panic(err)
 	}
 }
 
-func sendToTServer(r interface{}, s string) {
+func sendToTServer(r interface{}, user string, s string) {
+	server := config.ts
 	jsonValue, _ := json.Marshal(r)
-	resp, err := http.Post("http://"+config.ts+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
-	failOnError(err, "Error sending request tp TS")
-	io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close()
+
+	semaphoreChan <- struct{}{}
+	go func() {
+		if user == "" {
+			fmt.Println("dumpppp", r)
+			resp, err := http.Post("http://"+config.ts+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+			failOnError(err, "Error sending request to TS")
+			io.Copy(ioutil.Discard, resp.Body)
+			resp.Body.Close()
+
+			resp2, err2 := http.Post("http://"+config2.ts2+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+			failOnError(err2, "Error sending request to TS")
+			io.Copy(ioutil.Discard, resp2.Body)
+			resp2.Body.Close()
+
+			resp3, err3 := http.Post("http://"+config3.ts3+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+			failOnError(err3, "Error sending request to TS")
+			io.Copy(ioutil.Discard, resp3.Body)
+			resp3.Body.Close()
+
+			resp4, err4 := http.Post("http://"+config4.ts4+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+			failOnError(err4, "Error sending request to TS")
+			io.Copy(ioutil.Discard, resp4.Body)
+			resp4.Body.Close()
+
+			resp5, err5 := http.Post("http://"+config5.ts5+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+			failOnError(err5, "Error sending request to TS")
+			io.Copy(ioutil.Discard, resp5.Body)
+			resp5.Body.Close()
+
+			<-semaphoreChan
+			return
+
+		} else if len(user) > 0 && user[0] < 'C' { //1/3 of the way
+			server = config.ts
+		} else if len(user) > 0 && user[0] < 'P' {
+			server = config2.ts2
+		} else if len(user) > 0 && user[0] < 'c' {
+			server = config3.ts3
+		} else if len(user) > 0 && user[0] < 'o' {
+			server = config4.ts4
+		} else {
+			server = config5.ts5
+		}
+
+		resp, err := http.Post("http://"+server+":44416/"+s, "application/json", bytes.NewBuffer(jsonValue))
+		failOnError(err, "Error sending request to TS")
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+
+		<-semaphoreChan
+	}()
 }
 
 func runningInDocker() bool {
@@ -540,7 +637,7 @@ func runningInDocker() bool {
 }
 
 func main() {
-	//http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("../frontend"))))
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("/go/src/github.com/moonshot-trading/Web/frontend"))))
 	http.HandleFunc("/GetQuote", quoteHandler)
 	http.HandleFunc("/AddUser", addUserHandler)
 	http.HandleFunc("/AddFunds", addFundsHandler)
